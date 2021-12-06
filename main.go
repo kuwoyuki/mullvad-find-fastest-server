@@ -5,14 +5,11 @@ import (
 	"sort"
 	"time"
 
-	ping "github.com/sparrc/go-ping"
+	ping "github.com/go-ping/ping"
 	servers "github.com/victorb/mullvad-find-fastest-server/servers"
 )
 
 var pingCount = 3
-
-var mullvadAddr = ".mullvad.net"
-
 var results = map[string]int64{}
 
 func main() {
@@ -21,12 +18,19 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		// run as privileged as most distros don't allow access to unprivileged ICMP sockets
+		pinger.SetPrivileged(true)
+		// timeout event if https://github.com/go-ping/ping/pull/176 is merged to skipo server
+		pinger.Timeout = 5 * 1000 * 1000 * 1000 // 5s
 		pinger.Count = pingCount
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			fmt.Printf("%d bytes from %s: icmp_seq=%d time=%v\n",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt)
 		}
-		pinger.Run()                 // blocks until finished
+		err = pinger.Run() // Blocks until finished.
+		if err != nil {
+			panic(err)
+		}
 		stats := pinger.Statistics() // get send/receive/rtt stats
 		fmt.Printf("%s = %s\n", server, stats.AvgRtt.String())
 		results[server] = stats.AvgRtt.Nanoseconds()

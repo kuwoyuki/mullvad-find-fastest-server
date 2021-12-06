@@ -1,10 +1,14 @@
 ## mullvad-find-fastest-server
+
 > Find the fastest Wireguard server for Mullvad
 
-## Usage:
+```sh
+# setcap the binary to allow it to bind to raw sockets
+go build && doas setcap cap_net_raw=+ep ./mullvad-find-fastest-server &&
+./mullvad-find-fastest-server
 
-```
-go run main.go
+# or just run as root
+doas go run main.go
 ```
 
 ## License
