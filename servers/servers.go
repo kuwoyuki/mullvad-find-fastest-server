@@ -2,14 +2,14 @@ package servers
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 )
 
 type MullvadServer struct {
-	Hostname string `json:"hostname"`
-	// CountryCode      string `json:"country_code"`
+	Hostname    string `json:"hostname"`
+	CountryCode string `json:"country_code"`
 	// CountryName      string `json:"country_name"`
 	// CityCode         string `json:"city_code"`
 	// CityName         string `json:"city_name"`
@@ -23,30 +23,21 @@ type MullvadServer struct {
 	// StatusMessages   []string `json:"status_messages"`
 }
 
-var mullvadAddr = ".mullvad.net"
-
-func GetServers() []string {
+func GetServers() []MullvadServer {
 	resp, err := http.Get("https://api.mullvad.net/www/relays/all/")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	var mullvadServers []MullvadServer
-	var servers []string
 	err = json.Unmarshal(body, &mullvadServers)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	for _, s := range mullvadServers {
-		if s.Active == true && s.Type == "wireguard" {
-			servers = append(servers, s.Hostname+mullvadAddr)
-		}
-	}
-
-	return servers
+	return mullvadServers
 }

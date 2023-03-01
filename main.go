@@ -1,20 +1,45 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"sort"
 	"time"
 
-	ping "github.com/go-ping/ping"
+	"github.com/biter777/countries"
+	probing "github.com/prometheus-community/pro-bing"
 	servers "github.com/victorb/mullvad-find-fastest-server/servers"
 )
 
-var pingCount = 3
 var results = map[string]int64{}
+var mullvadAddr = ".relays.mullvad.net"
 
 func main() {
-	for _, server := range servers.GetServers() {
-		pinger, err := ping.NewPinger(server)
+	vpnType := flag.String("type", "wireguard", "vpn type")
+	vpnRegion := flag.String("region", "", "servers region")
+	vpnCountry := flag.String("country", "", "servers country")
+	pingCount := flag.Int("pingCount", 3, "ping count")
+	flag.Parse()
+
+	mullvadServers := servers.GetServers()
+
+	var servers []string
+
+	for _, s := range mullvadServers {
+		if !s.Active || s.Type != *vpnType {
+			continue
+		}
+		if *vpnCountry != "" && s.CountryCode != *vpnCountry {
+			continue
+		}
+		if *vpnRegion != "" && countries.ByName(s.CountryCode).Region().String() != *vpnRegion {
+			continue
+		}
+		servers = append(servers, s.Hostname+mullvadAddr)
+	}
+
+	for _, server := range servers {
+		pinger, err := probing.NewPinger(server)
 		if err != nil {
 			panic(err)
 		}
@@ -22,8 +47,8 @@ func main() {
 		pinger.SetPrivileged(true)
 		// timeout event if https://github.com/go-ping/ping/pull/176 is merged to skipo server
 		pinger.Timeout = 5 * 1000 * 1000 * 1000 // 5s
-		pinger.Count = pingCount
-		pinger.OnRecv = func(pkt *ping.Packet) {
+		pinger.Count = *pingCount
+		pinger.OnRecv = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes from %s: icmp_seq=%d time=%v\n",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt)
 		}
