@@ -26,13 +26,9 @@ func main() {
 	var servers []string
 
 	for _, s := range mullvadServers {
-		if !s.Active || s.Type != *vpnType {
-			continue
-		}
-		if *vpnCountry != "" && s.CountryCode != *vpnCountry {
-			continue
-		}
-		if *vpnRegion != "" && countries.ByName(s.CountryCode).Region().String() != *vpnRegion {
+		if !s.Active || s.Type != *vpnType ||
+			(*vpnCountry != "" && s.CountryCode != *vpnCountry) ||
+			(*vpnRegion != "" && countries.ByName(s.CountryCode).Region().String() != *vpnRegion) {
 			continue
 		}
 		servers = append(servers, s.Hostname+mullvadAddr)
@@ -46,7 +42,7 @@ func main() {
 		// run as privileged as most distros don't allow access to unprivileged ICMP sockets
 		pinger.SetPrivileged(true)
 		// timeout event if https://github.com/go-ping/ping/pull/176 is merged to skipo server
-		pinger.Timeout = 5 * 1000 * 1000 * 1000 // 5s
+		pinger.Timeout = 5 * time.Second // 5s
 		pinger.Count = *pingCount
 		pinger.OnRecv = func(pkt *probing.Packet) {
 			fmt.Printf("%d bytes from %s: icmp_seq=%d time=%v\n",
@@ -58,7 +54,11 @@ func main() {
 		}
 		stats := pinger.Statistics() // get send/receive/rtt stats
 		fmt.Printf("%s = %s\n", server, stats.AvgRtt.String())
-		results[server] = stats.AvgRtt.Nanoseconds()
+		avgRttNs := stats.AvgRtt.Nanoseconds()
+		if avgRttNs == 0 {
+			continue
+		}
+		results[server] = avgRttNs
 	}
 	type kv struct {
 		Key   string
